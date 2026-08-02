@@ -279,7 +279,8 @@
   },
   "panel": {
     "title": "Music Player",
-    "no_track": "Nothing playing"
+    "no_track": "Nothing playing",
+    "search_placeholder": "Search music..."
   },
   "settings": {
     "show_title": {

@@ -3,11 +3,19 @@
 local snapshot = noctalia.state.get("music_snapshot")
 local position = noctalia.state.get("music_position")
 
+local helper = ((noctalia.pluginDir() or ""):gsub("/+$", "")) .. "/musicctl.sh"
 local CACHE_DIR = (noctalia.getenv("XDG_CACHE_HOME") or ((noctalia.getenv("HOME") or "") .. "/.cache"))
   .. "/noctalia/plugins/music-search/thumbs"
 local thumbPath = nil
 local thumbForId = ""
 local thumbPending = false
+
+local searchQuery = ""
+local searchResults = {}
+local searchBusy = false
+local searchFailed = false
+local pendingSearchQuery = nil
+local lastCompletedQuery = ""
 
 local trCache = {}
 
@@ -19,6 +27,10 @@ local function tr(key)
   local value = noctalia.tr(key)
   trCache[key] = value
   return value
+end
+
+local function trim(value)
+  return tostring(value or ""):match("^%s*(.-)%s*$") or ""
 end
 
 local function shellQuote(value)
@@ -38,6 +50,10 @@ local function formatDuration(totalSeconds)
     return string.format("%d:%02d:%02d", hours, minutes, seconds)
   end
   return string.format("%d:%02d", minutes, seconds)
+end
+
+local function maxResultsSetting()
+  return tonumber(noctalia.getConfig("max_results") or 8) or 8
 end
 
 local render
@@ -60,11 +76,75 @@ local function ensureThumbnail(id, url)
   end)
 end
 
+local function playSearchEntry(entry)
+  searchQuery = ""
+  searchResults = {}
+  searchBusy = false
+  searchFailed = false
+  pendingSearchQuery = nil
+  lastCompletedQuery = ""
+  dispatch({ action = "play", payload = { entry = entry } })
+  render()
+end
+
+local startSearch
+
+startSearch = function(text)
+  local provider = ((snapshot or {}).provider) or "youtube"
+  searchBusy = true
+  searchFailed = false
+  lastCompletedQuery = text
+  local ok = noctalia.runAsync(
+    "bash " .. shellQuote(helper) .. " search " .. shellQuote(text) .. " " .. shellQuote(provider),
+    function(result)
+      searchBusy = false
+      searchFailed = result.exitCode ~= 0
+      local decoded, list = pcall(noctalia.json.decode, result.stdout or "")
+      searchResults = decoded and type(list) == "table" and list or {}
+      if pendingSearchQuery then
+        local nextQuery = pendingSearchQuery
+        pendingSearchQuery = nil
+        startSearch(nextQuery)
+        return
+      end
+      if text == trim(searchQuery) then
+        render()
+      end
+    end, 60000)
+  if not ok then
+    searchBusy = false
+    searchFailed = true
+    searchResults = {}
+  end
+end
+
+local function ensureSearch(text)
+  if text == "" then
+    searchResults = {}
+    searchBusy = false
+    searchFailed = false
+    pendingSearchQuery = nil
+    render()
+    return
+  end
+  if text == lastCompletedQuery then
+    render()
+    return
+  end
+  if searchBusy then
+    pendingSearchQuery = text
+    render()
+    return
+  end
+  startSearch(text)
+end
+
 render = function()
   local current = (snapshot or {}).current or {}
   local playing = (snapshot or {}).playing == true
   local paused = (snapshot or {}).paused == true
   local title = current.title or ""
+  local query = trim(searchQuery)
 
   local header = ui.row({ gap = 8, align = "center" }, {
     ui.glyph({ name = "music", size = 16 }),
@@ -79,46 +159,91 @@ render = function()
   })
 
   local children = {}
-  if thumbPath then
-    children[#children + 1] = ui.image({
-      path = thumbPath,
-      width = 320,
-      height = 180,
-      fit = "cover",
-      radius = 12,
-    })
-  end
-  if playing or title ~= "" then
-    local pos = math.max(0, math.floor(tonumber((position or {}).position) or 0))
-    local duration = math.max(0, math.floor(tonumber(current.duration) or 0))
-    children[#children + 1] = ui.row({ gap = 8, align = "center" }, {
-      ui.label({ text = formatDuration(pos), width = 44 }),
-      ui.slider({
-        min = 0,
-        max = math.max(1, duration),
-        step = 1,
-        value = pos,
-        flexGrow = 1,
-        onChange = function(value)
-          dispatch({ action = "seek", position = value })
-        end,
-      }),
-      ui.label({ text = formatDuration(duration), width = 44 }),
-    })
-    children[#children + 1] = ui.row({ gap = 8, align = "center" }, {
-      ui.button({ glyph = "stop", onClick = function()
-        dispatch({ action = "stop" })
-      end }),
-      ui.button({ glyph = paused and "player-play-filled" or "pause", onClick = function()
-        dispatch({ action = "toggle" })
-      end }),
-    })
+  if query ~= "" then
+    local rows = {}
+    local maxResults = maxResultsSetting()
+    local shown = 0
+    if searchBusy and #searchResults == 0 then
+      rows[1] = ui.label({ key = "search-busy", text = tr("search.searching"), color = "on_surface_variant" })
+    elseif searchFailed and #searchResults == 0 then
+      rows[1] = ui.label({ key = "search-failed", text = tr("search.failed_default"), color = "error" })
+    else
+      for _, entry in ipairs(searchResults) do
+        if shown >= maxResults then break end
+        shown = shown + 1
+        rows[#rows + 1] = ui.button({
+          key = "hit-" .. shown,
+          glyph = "music",
+          text = entry.title or tr("common.untitled"),
+          variant = "ghost",
+          contentAlign = "start",
+          onClick = function()
+            playSearchEntry(entry)
+          end,
+        })
+      end
+      if shown == 0 then
+        rows[1] = ui.label({ key = "search-empty", text = tr("search.no_results"), color = "on_surface_variant" })
+      end
+    end
+    children[#children + 1] = ui.scroll({ key = "results", flexGrow = 1, gap = 2 }, rows)
   else
-    children[#children + 1] = ui.label({ text = tr("panel.no_track") })
+    if thumbPath then
+      children[#children + 1] = ui.image({
+        path = thumbPath,
+        width = 320,
+        height = 180,
+        fit = "cover",
+        radius = 12,
+      })
+    end
+    if playing or title ~= "" then
+      local pos = math.max(0, math.floor(tonumber((position or {}).position) or 0))
+      local duration = math.max(0, math.floor(tonumber(current.duration) or 0))
+      children[#children + 1] = ui.row({ gap = 8, align = "center" }, {
+        ui.label({ text = formatDuration(pos), width = 44 }),
+        ui.slider({
+          min = 0,
+          max = math.max(1, duration),
+          step = 1,
+          value = pos,
+          flexGrow = 1,
+          onChange = function(value)
+            dispatch({ action = "seek", position = value })
+          end,
+        }),
+        ui.label({ text = formatDuration(duration), width = 44 }),
+      })
+      children[#children + 1] = ui.row({ gap = 8, align = "center" }, {
+        ui.button({ glyph = "stop", onClick = function()
+          dispatch({ action = "stop" })
+        end }),
+        ui.button({ glyph = paused and "player-play-filled" or "player-pause-filled", onClick = function()
+          dispatch({ action = "toggle" })
+        end }),
+      })
+    else
+      children[#children + 1] = ui.label({ text = tr("panel.no_track") })
+    end
   end
 
   panel.render(ui.column({ flexGrow = 1, gap = 16, padding = 16 }, {
     header,
+    ui.input({
+      key = "search-input",
+      value = searchQuery,
+      placeholder = tr("panel.search_placeholder"),
+      focus = true,
+      onChange = function(value)
+        searchQuery = value
+        ensureSearch(value)
+      end,
+      onSubmit = function()
+        if #searchResults > 0 then
+          playSearchEntry(searchResults[1])
+        end
+      end,
+    }),
     ui.column({ flexGrow = 1, gap = 12, align = "center" }, children),
   }))
 end

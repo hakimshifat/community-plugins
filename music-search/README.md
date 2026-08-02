@@ -65,7 +65,9 @@ player panel, right click stops. When no track is playing it shows an idle
 music icon.
 
 The `player` panel shows the current track title, its thumbnail, a seekbar,
-and stop/pause buttons:
+and stop/pause buttons. The search box on top looks up tracks directly from
+the panel: type to search, click a result (or press Enter for the top hit) to
+play it; clearing the box returns to the current track:
 
 noctalia msg panel-toggle kevichi7/music-search:player
 
