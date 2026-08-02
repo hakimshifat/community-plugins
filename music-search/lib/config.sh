@@ -107,7 +107,7 @@ yt_player_client() {
   if [[ -f "$SETTINGS_FILE" ]]; then
     configured="$(jq -r '.ytPlayerClient // empty' "$SETTINGS_FILE" 2>/dev/null || true)"
   fi
-  printf '%s\n' "${configured:-android}"
+  printf '%s\n' "${configured:-web_embedded}"
 }
 
 yt_extractor_args() {

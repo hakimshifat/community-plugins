@@ -297,11 +297,11 @@ set_cache_size() {
 }
 
 _set_yt_player_client_unlocked() {
-  local client="${1-android}"
+  local client="${1-web_embedded}"
   case "$client" in
-    android|web|default) ;;
+    android|web|web_embedded|default) ;;
     *)
-      die "Unknown YouTube player client: $client. Valid: android, web, default"
+      die "Unknown YouTube player client: $client. Valid: android, web, web_embedded, default"
       ;;
   esac
 

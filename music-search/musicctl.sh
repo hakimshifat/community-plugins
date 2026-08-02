@@ -111,7 +111,7 @@ case "$command" in
     set_cache_size "${1-0}"
     ;;
   set-yt-player-client)
-    set_yt_player_client "${1-android}"
+    set_yt_player_client "${1-web_embedded}"
     ;;
   create-playlist)
     create_playlist "${1-}"

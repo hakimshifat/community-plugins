@@ -247,6 +247,7 @@
       "description": "Client yt-dlp uses to play YouTube tracks (helps bypass throttling)",
       "android": "Android",
       "web": "Web",
+      "web_embedded": "Web (embedded)",
       "default": "Default"
     },
     "download_directory": {

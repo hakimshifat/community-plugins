@@ -296,6 +296,7 @@ local function handleEnded(state)
   end
 end
 
+local actionResume
 local function actionStop()
   if not snapshot.playing then
     setNotice("actions.already_stopped")
@@ -336,7 +337,7 @@ local function actionPause()
   end)
 end
 
-local function actionResume()
+actionResume = function()
   if not snapshot.playing or not snapshot.paused then return end
   snapshot.busy.resume = true
   publish()
@@ -362,7 +363,7 @@ local function actionToggle()
 end
 
 local function actionSeek(value)
-  if not snapshot.playing then
+  if not snapshot.playing and (snapshot.current or {}).id == "" then
     setNotice("speed.no_playback")
     publish()
     return
@@ -947,7 +948,7 @@ local function applyConfig()
   cfg = {
     provider = noctalia.getConfig("provider") or "youtube",
     sortBy = noctalia.getConfig("sort_by") or "date",
-    ytClient = noctalia.getConfig("yt_player_client") or "android",
+    ytClient = noctalia.getConfig("yt_player_client") or "web_embedded",
     downloadDir = noctalia.expandPath(noctalia.getConfig("download_directory") or "~/Music/Noctalia"),
     cacheMb = tostring(noctalia.getConfig("download_cache_max_mb") or 0),
     autoSave = noctalia.getConfig("auto_save_mp3") == true,

@@ -16,6 +16,7 @@ local searchBusy = false
 local searchFailed = false
 local pendingSearchQuery = nil
 local lastCompletedQuery = ""
+local dragTarget = nil
 
 local trCache = {}
 
@@ -200,16 +201,22 @@ render = function()
     if playing or title ~= "" then
       local pos = math.max(0, math.floor(tonumber((position or {}).position) or 0))
       local duration = math.max(0, math.floor(tonumber(current.duration) or 0))
+      local sliderValue = dragTarget or pos
       children[#children + 1] = ui.row({ gap = 8, align = "center" }, {
-        ui.label({ text = formatDuration(pos), width = 44 }),
+        ui.label({ text = formatDuration(sliderValue), width = 44 }),
         ui.slider({
           min = 0,
           max = math.max(1, duration),
           step = 1,
-          value = pos,
+          value = sliderValue,
           flexGrow = 1,
           onChange = function(value)
-            dispatch({ action = "seek", position = value })
+            dragTarget = tonumber(value) or 0
+          end,
+          onDragEnd = function()
+            local target = dragTarget or pos
+            dragTarget = nil
+            dispatch({ action = "seek", position = target })
           end,
         }),
         ui.label({ text = formatDuration(duration), width = 44 }),
