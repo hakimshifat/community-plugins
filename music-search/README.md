@@ -15,7 +15,7 @@ verbatim from the original.
 | Field | Value |
 | --- | --- |
 | ID | `kevichi7/music-search` |
-| Entries | Bar widget: `music`; launcher provider: `launcher`; service: `svc` |
+| Entries | Bar widget: `music`; player panel: `player`; launcher provider: `launcher`; service: `svc` |
 | Launcher Prefix | `/music` |
 
 ## Requirements
@@ -60,9 +60,14 @@ Activating a search result or library track plays it. The first result of any
 list additionally shows actions to save/remove it from the library, add it to
 the queue, rate it, edit its metadata, manage its tags, and download it as mp3.
 
-The bar widget shows the current track while playing: left click pauses/
-resumes, right click stops. When no track is playing it shows an idle music
-icon.
+The bar widget shows the current track while playing: left click opens the
+player panel, right click stops. When no track is playing it shows an idle
+music icon.
+
+The `player` panel shows the current track title, its thumbnail, a seekbar,
+and stop/pause buttons:
+
+noctalia msg panel-toggle kevichi7/music-search:player
 
 ## Settings
 

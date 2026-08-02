@@ -105,6 +105,7 @@ local function applyStateJson(text)
     error = state.error or "",
     endReason = state.endReason or "",
     updatedAt = state.updatedAt or "",
+    thumbnail = (snapshot.current or {}).thumbnail or "",
   }
   if not snapshot.playing then
     snapshot.paused = false
@@ -166,6 +167,7 @@ local function playEntry(entry, fromQueue)
   }, function(result)
     snapshot.busy.play = false
     local state = applyStateJson(result.stdout)
+    snapshot.current.thumbnail = entry.thumbnail or ""
     if result.exitCode ~= 0 then
       snapshot.lastError = lastErrorFrom(result, "errors.playback_failed")
     elseif not state then
@@ -411,6 +413,7 @@ local function playUrl(url)
       url = entry.url or url,
       uploader = entry.uploader or "",
       duration = tonumber(entry.duration) or 0,
+      thumbnail = entry.thumbnail or "",
     }, false)
   end)
 end

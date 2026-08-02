@@ -275,7 +275,11 @@
   "bar_widget": {
     "tooltip_idle": "Not playing",
     "tooltip_playing": "Now playing: {title}",
-    "click_hint": "Left click: pause/resume · right click: stop"
+    "click_hint": "Left click: open player · right click: stop"
+  },
+  "panel": {
+    "title": "Music Player",
+    "no_track": "Nothing playing"
   },
   "settings": {
     "show_title": {
