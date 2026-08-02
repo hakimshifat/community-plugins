@@ -61,13 +61,15 @@ list additionally shows actions to save/remove it from the library, add it to
 the queue, rate it, edit its metadata, manage its tags, and download it as mp3.
 
 The bar widget shows the current track while playing: left click opens the
-player panel, right click stops. When no track is playing it shows an idle
-music icon.
+player panel. When no track is playing it shows an idle music icon.
 
 The `player` panel shows the current track title, its thumbnail, a seekbar,
-and stop/pause buttons. The search box on top looks up tracks directly from
-the panel: type to search, click a result (or press Enter for the top hit) to
-play it; clearing the box returns to the current track:
+and previous/play-pause/next buttons. The next button skips the queued track,
+or plays a related song (YouTube radio) when nothing is queued; the previous
+button steps back through recently played tracks. The search box on top looks
+up tracks directly from the panel: type to search, click a result (or press
+Enter for the top hit) to play it; clearing the box returns to the current
+track:
 
 noctalia msg panel-toggle kevichi7/music-search:player
 

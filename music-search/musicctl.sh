@@ -38,6 +38,9 @@ case "$command" in
   details)
     details_for_url "${1-}"
     ;;
+  radio)
+    radio_for_url "${1-}"
+    ;;
   save)
     save_entry "${1-}" "${2-}" "${3-}" "${4-}" "${5-0}"
     ;;

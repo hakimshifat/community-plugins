@@ -98,8 +98,4 @@ function onClick()
   noctalia.togglePanel("kevichi7/music-search:player")
 end
 
-function onRightClick()
-  noctalia.state.set("music_command", { action = "stop" })
-end
-
 render()

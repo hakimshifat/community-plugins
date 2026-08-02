@@ -285,6 +285,37 @@ details_for_url() {
       }'
 }
 
+radio_for_url() {
+  local url="${1-}"
+  require_cmd jq
+  require_cmd yt-dlp
+
+  if [[ -z "$url" ]]; then
+    die "Missing URL."
+  fi
+
+  if [[ ! "$url" =~ youtube\.com|youtu\.be ]]; then
+    printf '[]'
+    return 0
+  fi
+
+  local video_id=""
+  video_id="$(printf '%s' "$url" | sed -n 's#.*[?&]v=\([A-Za-z0-9_-]\{1,\}\).*#\1#p')"
+  if [[ -z "$video_id" ]]; then
+    printf '[]'
+    return 0
+  fi
+
+  local radio_url="https://www.youtube.com/watch?v=${video_id}&list=RD${video_id}"
+  local -a ytdlp_args
+  ytdlp_args=(yt-dlp --ignore-config --flat-playlist --no-warnings --dump-single-json)
+
+  "${ytdlp_args[@]}" "$radio_url" 2>/dev/null \
+    | jq -c --arg seedId "$video_id" \
+        '[.entries[]? | select(.id? != null) | select(.id != $seedId)
+          | {id: (.id // ""), url: (.url // .webpage_url // ""), title: (.title // "")}]'
+}
+
 download_mp3() {
   local title="${1-}"
   local url="${2-}"

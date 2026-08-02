@@ -33,6 +33,14 @@ local queueState = {
   lastHandledUpdate = "0",
 }
 
+local radioState = {
+  busy = false,
+  entries = {},
+  index = 0,
+}
+
+local history = {}
+
 local cfg = {}
 local ready = false
 local lastPublished = ""
@@ -178,7 +186,22 @@ local function loadQueueActive()
   end
 end
 
-local function playEntry(entry, fromQueue)
+local function pushHistory(entry)
+  if not entry or entry.id == "" then return end
+  if #history > 0 and history[#history].id == entry.id then return end
+  history[#history + 1] = {
+    id = entry.id, title = entry.title or "", url = entry.url or "",
+    uploader = entry.uploader or "", duration = entry.duration or 0,
+    thumbnail = entry.thumbnail or "",
+  }
+  if #history > 30 then
+    table.remove(history, 1)
+  end
+end
+
+local maybeAutoSave
+
+local function playEntry(entry, fromQueue, fromRadio)
   snapshot.busy.play = true
   snapshot.lastError = ""
   publish()
@@ -191,7 +214,15 @@ local function playEntry(entry, fromQueue)
     tostring(entry.duration or 0),
   }, function(result)
     snapshot.busy.play = false
+    local previous = snapshot.current or {}
     local state = applyStateJson(result.stdout)
+    if state and (snapshot.current or {}).id ~= "" and (snapshot.current or {}).id ~= previous.id then
+      pushHistory(previous)
+    end
+    if not fromRadio then
+      radioState.entries = {}
+      radioState.index = 0
+    end
     snapshot.current.thumbnail = entry.thumbnail or ""
     if result.exitCode ~= 0 then
       snapshot.lastError = lastErrorFrom(result, "errors.playback_failed")
@@ -217,7 +248,7 @@ local function playEntry(entry, fromQueue)
   end)
 end
 
-local function maybeAutoSave(entry)
+maybeAutoSave = function(entry)
   if not cfg.autoSave or autoSaveBusy then return end
   if not entry or entry.id == "" or entry.id == autoSavedId then return end
   autoSaveBusy = true
@@ -249,13 +280,20 @@ local function launchNextQueue()
   playEntry(entry, true)
 end
 
+local radioNext
+
 local function handleEnded(state)
-  if not queueState.active or queueState.launching then return end
-  if snapshot.playing then return end
+  if queueState.launching or snapshot.playing then return end
   if state.endReason ~= "finished" and state.endReason ~= "error" then return end
   if not state.updatedAt or state.updatedAt == queueState.lastHandledUpdate then return end
   queueState.lastHandledUpdate = state.updatedAt
-  launchNextQueue()
+  if queueState.active then
+    launchNextQueue()
+    return
+  end
+  if #radioState.entries > 0 and radioState.index < #radioState.entries then
+    radioNext()
+  end
 end
 
 local function actionStop()
@@ -413,7 +451,7 @@ local function refreshAll()
   end)
 end
 
-local function playUrl(url)
+local function playUrl(url, fromRadio)
   if not url or url == "" then return end
   snapshot.busy.play = true
   snapshot.lastError = ""
@@ -439,7 +477,7 @@ local function playUrl(url)
       uploader = entry.uploader or "",
       duration = tonumber(entry.duration) or 0,
       thumbnail = entry.thumbnail or "",
-    }, false)
+    }, false, fromRadio == true)
   end)
 end
 
@@ -512,6 +550,77 @@ local function queueSkip()
     return
   end
   launchNextQueue()
+end
+
+local function playRadioEntry(entry)
+  if not entry or entry.url == "" then
+    setNotice("radio.no_related")
+    publish()
+    return
+  end
+  playUrl(entry.url, true)
+end
+
+radioNext = function()
+  if radioState.busy then return end
+  if #radioState.entries == 0 then
+    local url = (snapshot.current or {}).url or ""
+    if url == "" then
+      setNotice("radio.no_track")
+      publish()
+      return
+    end
+    radioState.busy = true
+    setNotice("radio.loading")
+    publish()
+    run({ "radio", url }, function(result)
+      radioState.busy = false
+      local decoded, entries = pcall(noctalia.json.decode, result.stdout or "")
+      radioState.entries = (decoded and type(entries) == "table") and entries or {}
+      radioState.index = 0
+      if result.exitCode ~= 0 or #radioState.entries == 0 then
+        setNotice("radio.no_related")
+        publish()
+        return
+      end
+      playRadioEntry(radioState.entries[1])
+    end)
+    return
+  end
+  if radioState.index >= #radioState.entries then
+    setNotice("radio.ended")
+    publish()
+    return
+  end
+  radioState.index = radioState.index + 1
+  playRadioEntry(radioState.entries[radioState.index])
+end
+
+local function actionNext()
+  if #snapshot.queue > 0 then
+    queueSkip()
+    return
+  end
+  radioNext()
+end
+
+local function actionPrev()
+  if #history > 0 then
+    local entry = table.remove(history)
+    playEntry(entry, false)
+    return
+  end
+  if snapshot.playing then
+    run({ "seek", "0" }, function(result)
+      if result.exitCode ~= 0 then
+        snapshot.lastError = lastErrorFrom(result, "errors.seek_failed")
+        publish()
+      end
+    end)
+    return
+  end
+  setNotice("radio.no_prev")
+  publish()
 end
 
 local function queueEnqueue(entry)
@@ -734,6 +843,10 @@ local function dispatch(message)
     actionResume()
   elseif action == "toggle" then
     actionToggle()
+  elseif action == "next" then
+    actionNext()
+  elseif action == "prev" then
+    actionPrev()
   elseif action == "seek" then
     actionSeek(p.position)
   elseif action == "speed" then
@@ -801,7 +914,7 @@ end
 function onIpc(event, payload)
   if event == "help" then
     noctalia.notify("Music Search IPC",
-      "help · status\nplay <url> · play_url <url>\nsave <url> · save_url <url>\ntoggle · pause · resume · stop\nseek <sec> · speed <x>\nqueue_skip · queue_clear · queue_start\nplaylist_play <id> · import_folder <path>")
+      "help · status\nplay <url> · play_url <url>\nsave <url> · save_url <url>\ntoggle · pause · resume · stop\nseek <sec> · speed <x>\nnext · prev (history/radio)\nqueue_skip · queue_clear · queue_start\nplaylist_play <id> · import_folder <path>")
     return
   end
   if not ready then return end

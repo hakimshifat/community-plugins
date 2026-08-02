@@ -191,8 +191,8 @@ render = function()
     if thumbPath then
       children[#children + 1] = ui.image({
         path = thumbPath,
-        width = 320,
-        height = 180,
+        width = 256,
+        height = 144,
         fit = "cover",
         radius = 12,
       })
@@ -215,11 +215,14 @@ render = function()
         ui.label({ text = formatDuration(duration), width = 44 }),
       })
       children[#children + 1] = ui.row({ gap = 8, align = "center" }, {
-        ui.button({ glyph = "stop", onClick = function()
-          dispatch({ action = "stop" })
+        ui.button({ glyph = "media-prev", tooltip = tr("panel.prev_track"), onClick = function()
+          dispatch({ action = "prev" })
         end }),
-        ui.button({ glyph = paused and "player-play-filled" or "player-pause-filled", onClick = function()
+        ui.button({ glyph = paused and "player-play-filled" or "player-pause-filled", tooltip = tr("panel.toggle_play"), onClick = function()
           dispatch({ action = "toggle" })
+        end }),
+        ui.button({ glyph = "media-next", tooltip = tr("panel.next_track"), onClick = function()
+          dispatch({ action = "next" })
         end }),
       })
     else
