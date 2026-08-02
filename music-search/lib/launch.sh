@@ -4,12 +4,13 @@
 launch_youtube_stream() {
   local source_url="$1"
   local speed="${2-1}"
+  local client_override="${3-}"
   local -a mpv_cmd=(
     mpv
     --no-video
     --force-window=no
     --audio-display=no
-    --ytdl-format=bestaudio/best
+    --ytdl-format=bestaudio[acodec=opus]/bestaudio/best/best
     --demuxer-max-bytes=256K
     --speed="$speed"
     --log-file="$LOG_FILE"
@@ -17,7 +18,7 @@ launch_youtube_stream() {
     --title="Noctalia music-search"
   )
   local raw_opt
-  raw_opt="$(yt_mpv_raw_option)"
+  raw_opt="$(yt_mpv_raw_option "$client_override")"
   [[ -n "$raw_opt" ]] && mpv_cmd+=("$raw_opt")
   mpv_cmd+=("$source_url")
 
@@ -27,14 +28,15 @@ launch_youtube_stream() {
 launch_youtube_cached() {
   local source_url="$1"
   local speed="${2-1}"
+  local client_override="${3-}"
   local extractor_arg
-  extractor_arg="$(yt_extractor_args)"
+  extractor_arg="$(yt_extractor_args "$client_override")"
 
   nohup setsid bash -lc '
     set -euo pipefail
     shopt -s nullglob
     rm -f "$2".*
-    ytdlp_args=(yt-dlp --ignore-config --no-warnings -f bestaudio/best --no-part -o "$2.%(ext)s")
+    ytdlp_args=(yt-dlp --ignore-config --no-warnings -f 'bestaudio[acodec=opus]/bestaudio/best/best' --no-part -o "$2.%(ext)s")
     [[ -n "$5" ]] && ytdlp_args+=("$5")
     "${ytdlp_args[@]}" -- "$1" >>"$4" 2>&1
     files=("$2".*)
@@ -47,7 +49,7 @@ launch_youtube_cached() {
 
 wait_for_audio_start() {
   local pid="$1"
-  local attempts="${2-24}"
+  local attempts="${2-40}"
 
   for _ in $(seq 1 "$attempts"); do
     if [[ -f "$LOG_FILE" ]] && grep -q "starting audio playback" "$LOG_FILE" 2>/dev/null; then

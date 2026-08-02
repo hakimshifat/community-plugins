@@ -132,6 +132,28 @@ _play_track_state_phase() {
       cleanup_runtime_cache
       : > "$LOG_FILE"
 
+      launch_youtube_stream "$url" "$desired_speed" "android"
+      pid="$!"
+      printf '%s\n' "$pid" > "$PID_FILE"
+
+      if wait_for_audio_start "$pid" 24; then
+        _write_state_unlocked true "$entry_id" "$title" "$url" "$uploader" "$duration" "$desired_speed" "$pid" "" ""
+        _emit_state_unlocked
+        return 0
+      fi
+
+      if is_running_pid "$pid"; then
+        terminate_pid "$pid"
+        sleep 0.3
+        if is_running_pid "$pid"; then
+          force_terminate_pid "$pid"
+        fi
+      fi
+
+      rm -f "$PID_FILE"
+      cleanup_runtime_cache
+      : > "$LOG_FILE"
+
       launch_youtube_cached "$url" "$desired_speed"
     fi
   else
@@ -140,7 +162,7 @@ _play_track_state_phase() {
       --no-video
       --force-window=no
       --audio-display=no
-      --ytdl-format="bestaudio/best"
+      --ytdl-format="bestaudio[acodec=opus]/bestaudio/best/best"
       --demuxer-max-bytes=256K
       --speed="$desired_speed"
       --log-file="$LOG_FILE"

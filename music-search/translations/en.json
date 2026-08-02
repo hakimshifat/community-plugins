@@ -126,7 +126,8 @@
     "playing_shuffled_playlist": "Playing shuffled playlist",
     "stopped": "Playback stopped",
     "paused": "Playback paused",
-    "resumed": "Playback resumed"
+    "resumed": "Playback resumed",
+    "stuck_detected": "Playback commands appear stuck. If controls stop responding, re-enable the plugin (noctalia msg plugins disable + enable)."
   },
   "panel": {
     "title": "Music Player",
@@ -244,7 +245,7 @@
     },
     "yt_player_client": {
       "label": "YouTube player client",
-      "description": "Client yt-dlp uses to play YouTube tracks (helps bypass throttling)",
+      "description": "Client yt-dlp uses to play YouTube tracks (web_embedded gives the best audio quality; falls back to tv/web/android when blocked)",
       "android": "Android",
       "web": "Web",
       "web_embedded": "Web (embedded)",

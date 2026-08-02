@@ -110,22 +110,38 @@ yt_player_client() {
   printf '%s\n' "${configured:-web_embedded}"
 }
 
-yt_extractor_args() {
+yt_client_chain() {
+  local override="${1-}"
   local client
-  client="$(yt_player_client)"
-  if [[ "$client" == "default" || -z "$client" ]]; then
+  if [[ -n "$override" ]]; then
+    client="$override"
+  else
+    client="$(yt_player_client)"
+  fi
+  case "$client" in
+    ""|default) return 0 ;;
+    android) printf '%s\n' "android" ;;
+    web) printf '%s\n' "web,tv,android" ;;
+    web_embedded) printf '%s\n' "web_embedded,tv,web,android" ;;
+  esac
+}
+
+yt_extractor_args() {
+  local chain
+  chain="$(yt_client_chain "${1-}")"
+  if [[ -z "$chain" ]]; then
     return 0
   fi
-  printf '%s\n' "--extractor-args=youtube:player_client=${client}"
+  printf '%s\n' "--extractor-args=youtube:player_client=${chain}"
 }
 
 yt_mpv_raw_option() {
-  local client
-  client="$(yt_player_client)"
-  if [[ "$client" == "default" || -z "$client" ]]; then
+  local chain
+  chain="$(yt_client_chain "${1-}")"
+  if [[ -z "$chain" ]]; then
     return 0
   fi
-  printf '%s\n' "--ytdl-raw-options=extractor-args=youtube:player_client=${client}"
+  printf '%s\n' "--ytdl-raw-options=extractor-args=\"youtube:player_client=${chain}\""
 }
 
 downloads_dir() {

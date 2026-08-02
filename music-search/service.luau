@@ -52,6 +52,7 @@ local autoSavedId = ""
 local thumbnailBusy = false
 local thumbnailRecoveredFor = ""
 local commandsInFlight = 0
+local stuckSince = 0
 
 local function shellQuote(value)
   return "'" .. tostring(value):gsub("'", "'\\''") .. "'"
@@ -65,7 +66,12 @@ local function run(args, onDone)
   end
   noctalia.runAsync(cmd, function(result)
     commandsInFlight = commandsInFlight - 1
-    if onDone then onDone(result) end
+    if onDone then
+      local ok, err = pcall(onDone, result)
+      if not ok then
+        print("music-search: command callback failed: " .. tostring(err))
+      end
+    end
   end, 60000)
 end
 
@@ -990,6 +996,15 @@ end
 function update()
   if not ready then return end
   tick = tick + 1
+  if commandsInFlight > 0 then
+    if stuckSince == 0 then stuckSince = tick end
+    if tick - stuckSince == 120 then
+      stuckSince = 0
+      noctalia.notify("Music Search", noctalia.tr("notices.stuck_detected"))
+    end
+  else
+    stuckSince = 0
+  end
   if snapshot.playing and not positionBusy then
     positionBusy = true
     run({ "position" }, function(result)
