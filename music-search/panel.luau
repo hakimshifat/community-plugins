@@ -60,8 +60,6 @@ local function ensureThumbnail(id, url)
   end)
 end
 
-local render
-
 render = function()
   local current = (snapshot or {}).current or {}
   local playing = (snapshot or {}).playing == true
@@ -111,7 +109,7 @@ render = function()
       ui.button({ glyph = "stop", onClick = function()
         dispatch({ action = "stop" })
       end }),
-      ui.button({ glyph = paused and "play" or "pause", onClick = function()
+      ui.button({ glyph = paused and "player-play-filled" or "pause", onClick = function()
         dispatch({ action = "toggle" })
       end }),
     })
@@ -138,6 +136,8 @@ noctalia.state.watch("music_position", function(value)
 end)
 
 noctalia.runAsync("mkdir -p " .. shellQuote(CACHE_DIR), function()
+  local current = (snapshot or {}).current or {}
+  ensureThumbnail(current.id or "", current.thumbnail or "")
   render()
 end)
 

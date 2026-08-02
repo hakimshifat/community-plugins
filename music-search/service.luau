@@ -41,6 +41,8 @@ local positionBusy = false
 local statusBusy = false
 local autoSaveBusy = false
 local autoSavedId = ""
+local thumbnailBusy = false
+local thumbnailRecoveredFor = ""
 local commandsInFlight = 0
 
 local function shellQuote(value)
@@ -87,6 +89,8 @@ local function lastErrorFrom(result, fallbackKey)
   return message
 end
 
+local recoverThumbnail
+
 local function applyStateJson(text)
   local state = decode(text)
   if not state or type(state) ~= "table" or type(state.isPlaying) ~= "boolean" then
@@ -105,12 +109,33 @@ local function applyStateJson(text)
     error = state.error or "",
     endReason = state.endReason or "",
     updatedAt = state.updatedAt or "",
-    thumbnail = (snapshot.current or {}).thumbnail or "",
+    thumbnail = ((snapshot.current or {}).id == state.id)
+        and ((snapshot.current or {}).thumbnail or "") or "",
   }
   if not snapshot.playing then
     snapshot.paused = false
   end
+  recoverThumbnail()
   return state
+end
+
+recoverThumbnail = function()
+  local current = snapshot.current or {}
+  if thumbnailBusy or current.thumbnail ~= "" or not snapshot.playing then return end
+  if current.id == "" or current.id == thumbnailRecoveredFor then return end
+  thumbnailRecoveredFor = current.id
+  thumbnailBusy = true
+  local url = current.url
+  run({ "details", url }, function(result)
+    thumbnailBusy = false
+    if result.exitCode == 0 then
+      local entry = decode(result.stdout)
+      if entry and entry.thumbnail and entry.thumbnail ~= "" then
+        snapshot.current.thumbnail = entry.thumbnail
+        publish()
+      end
+    end
+  end)
 end
 
 local function applyLibraryJson(text)
